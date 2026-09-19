@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "id": "krisag.nightlight",
+  "name": "Sunset Night Light",
+  "version": "1.0.0",
+  "author": "krisag",
+  "description": "Night light that follows your local sunset, with a bar popup to see and override it",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Sunset Night Light",
+    "description": "Night light that follows your local sunset, with a bar popup to see and override it",
+    "category": "Status",
+    "allowMultiple": false,
+    "defaultSection": "center",
+    "defaults": {
+      "eveningTemperature": 3400,
+      "lateTemperature": 2700,
+      "lateAfterMinutes": 180,
+      "offTime": "07:00"
+    },
+    "schema": [
+      {
+        "key": "eveningTemperature",
+        "type": "integer",
+        "label": "Evening temperature (K)",
+        "description": "Applied at sunset.",
+        "min": 1900,
+        "max": 6500,
+        "step": 100,
+        "defaultValue": 3400
+      },
+      {
+        "key": "lateTemperature",
+        "type": "integer",
+        "label": "Late temperature (K)",
+        "description": "Applied later in the evening.",
+        "min": 1900,
+        "max": 6500,
+        "step": 100,
+        "defaultValue": 2700
+      },
+      {
+        "key": "lateAfterMinutes",
+        "type": "integer",
+        "label": "Late starts after sunset (minutes)",
+        "description": "0 keeps the evening temperature all night.",
+        "min": 0,
+        "max": 600,
+        "step": 15,
+        "defaultValue": 180
+      },
+      {
+        "key": "offTime",
+        "type": "string",
+        "label": "Off in the morning at (HH:MM)",
+        "defaultValue": "07:00"
+      }
+    ]
+  }
+}
