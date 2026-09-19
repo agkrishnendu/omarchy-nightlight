@@ -4,7 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Bar pill + popup for the bundled nightlight-schedule script. All schedule
+// Bar pill + popup for the bundled src/nightlight-schedule.py. All schedule
 // and override logic lives in that script; this only renders its `--json`
 // status, runs its `sync` on a poll, and calls its set/resume/restart
 // commands.
@@ -15,7 +15,7 @@ Panel {
   manageIpc: false
 
   // Run through python3 so the plugin works even if git drops the exec bit.
-  readonly property string script: decodeURIComponent(String(Qt.resolvedUrl("nightlight-schedule")).replace(/^file:\/\//, ""))
+  readonly property string script: decodeURIComponent(String(Qt.resolvedUrl("src/nightlight-schedule.py")).replace(/^file:\/\//, ""))
   readonly property var scheduleArgs: [
     "--evening-temp", String(setting("eveningTemperature", 3400)),
     "--late-temp", String(setting("lateTemperature", 2700)),

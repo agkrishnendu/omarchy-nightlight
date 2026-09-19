@@ -84,17 +84,23 @@ address through wttr.in and caches the result.
 
 ## Command line
 
-The widget is a thin front end to the bundled `nightlight-schedule` script,
+The widget is a thin front end to the bundled `src/nightlight-schedule.py`,
 which you can also run yourself:
 
 ```bash
-S=~/.config/omarchy/plugins/krisag.nightlight/nightlight-schedule
+S=~/.config/omarchy/plugins/krisag.nightlight/src/nightlight-schedule.py
 $S status                         # now 3400K, 2700K at 21:18
 $S set 2700 --until morning       # --until next | morning | 1h | 30m | HH:MM
 $S set off                        # off until the next scheduled change
 $S resume                         # back to the schedule
 $S restart                        # if hyprsunset stops answering
 $S status --json                  # what the widget reads
+```
+
+To make it a command, symlink it onto your `PATH`:
+
+```bash
+ln -s ~/.config/omarchy/plugins/krisag.nightlight/src/nightlight-schedule.py ~/.local/bin/nightlight-schedule
 ```
 
 ## How it works
@@ -109,6 +115,34 @@ $S status --json                  # what the widget reads
   3. re-applies an active override
 - Its state is kept in `~/.local/state/nightlight-schedule/`: the override,
   the last settings used, and the cached coordinates.
+
+## Development
+
+```
+manifest.json               plugin manifest and settings schema
+Panel.qml                   bar icon and popup; renders `status --json`
+src/nightlight-schedule.py  command entry point
+src/nightlight/
+  config.py                 paths, defaults, state files
+  sun.py                    location lookup and sunset calculation
+  hyprsunset.py             hyprctl IPC, starting and stopping hyprsunset
+  profiles.py               generating and reading hyprsunset.conf
+  schedule.py               time logic over the daily profiles (no I/O)
+  override.py               overrides and keeping them applied
+  status.py                 the status report
+  cli.py                    argument parsing and `sync`
+tests/                      unit tests (standard library only)
+```
+
+Run the tests and check the plugin before you push:
+
+```bash
+python3 -B -m unittest discover -s tests
+omarchy plugin validate .
+```
+
+The tests point every path at a temporary directory and replace hyprsunset
+with a stub, so they never touch your screen or config.
 
 ## Uninstall
 
