@@ -32,6 +32,10 @@ It needs `hyprsunset` and `python3`, which Omarchy already ships. You don't
 need to change your autostart or add a systemd timer. The plugin starts
 hyprsunset and refreshes the schedule by itself while the shell is running.
 
+To update, run `omarchy plugin update krisag.nightlight`, then
+`omarchy restart shell`. Without the restart, the shell's hot reload can leave
+the old copy of the widget running alongside the new one.
+
 ### Remove the built-in night light toggle (recommended)
 
 Omarchy's indicators widget has its own night light toggle, which switches

@@ -27,6 +27,9 @@ Panel {
   readonly property string alertIcon: String.fromCodePoint(0xF0026)
 
   property var status: null
+  // A refresh asked for while a command runs (e.g. settings arriving during
+  // the first sync) runs as soon as it finishes instead of being dropped.
+  property bool syncPending: false
   // Hold applied by the preset/slider buttons; follows an active override.
   property string hold: "next"
   readonly property var holds: [
@@ -70,7 +73,17 @@ Panel {
   }
 
   function refresh() {
-    if (!syncProc.running && !actionProc.running) syncProc.running = true
+    if (syncProc.running || actionProc.running) {
+      syncPending = true
+      return
+    }
+    syncProc.running = true
+  }
+
+  function runPending() {
+    if (!syncPending) return
+    syncPending = false
+    refresh()
   }
 
   function setTemperature(value) { run(["set", String(value), "--until", root.hold]) }
@@ -123,7 +136,6 @@ Panel {
 
   onOpenedChanged: if (opened) refresh()
   onScheduleArgsChanged: refresh()
-  Component.onCompleted: refresh()
 
   visible: shown
   implicitWidth: shown ? button.implicitWidth : 0
@@ -133,13 +145,18 @@ Panel {
     id: syncProc
     command: ["python3", root.script, "sync", "--json"].concat(root.scheduleArgs)
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.applyStatus(text) }
+    onExited: root.runPending()
   }
 
   Process {
     id: actionProc
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.applyStatus(text) }
+    onExited: root.runPending()
   }
 
+  // The bar injects `settings` after the widget completes, so the first sync
+  // waits a moment rather than regenerating the schedule with defaults.
+  Timer { interval: 1000; running: true; onTriggered: root.refresh() }
   Timer { interval: 30000; running: true; repeat: true; onTriggered: root.refresh() }
   Timer { id: boundaryTimer; repeat: false; onTriggered: root.refresh() }
 
