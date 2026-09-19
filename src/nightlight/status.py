@@ -3,17 +3,21 @@
 import json
 from datetime import datetime
 
-from . import hyprsunset, override, profiles, schedule
+from . import hyprsunset, lifecycle, override, profiles, schedule
 
 
 def report(problem=None):
     now = datetime.now()
-    profs = profiles.load_profiles()
+    enabled = lifecycle.enabled()
+    # Until enabled, hyprsunset.conf is the user's own: don't present it as
+    # our schedule
+    profs = profiles.load_profiles() if enabled else []
     active, nxt = schedule.active_and_next(schedule.occurrences(profs, now), now)
-    ov = override.current(now)
+    ov = override.current(now) if enabled else None
     temp = hyprsunset.current_temp()
     scheduled = active[1] if active else None
     return {
+        "enabled": enabled,
         "ok": temp is not None,
         "running": hyprsunset.pid() is not None,
         "problem": problem,
@@ -39,6 +43,9 @@ def kelvin_label(k):
 
 
 def describe(s):
+    if not s["enabled"]:
+        return ("night light is not enabled: `nightlight-schedule enable` backs up\n"
+                "~/.config/hypr/hyprsunset.conf and replaces it with a sunset schedule")
     lines = []
     if s["problem"]:
         lines.append(f"problem: {s['problem']}")

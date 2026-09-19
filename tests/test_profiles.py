@@ -1,10 +1,9 @@
 import types
 import unittest
 from datetime import date, datetime
-from unittest import mock
 
 import helpers
-from nightlight import config, profiles, sun
+from nightlight import config, profiles
 
 SETTINGS = dict(config.DEFAULTS)
 TODAY = date(2026, 9, 19)
@@ -49,20 +48,11 @@ class RenderConf(unittest.TestCase):
 
 
 class Update(helpers.SandboxTest):
-    def setUp(self):
-        super().setUp()
-        patcher = mock.patch.object(sun, "location", return_value=(12.983, 77.583))
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def test_first_run_backs_up_user_config_once(self):
+    def test_refuses_to_overwrite_the_users_config(self):
         self.write_conf("# my own config\n")
-        self.assertTrue(profiles.update(SETTINGS, today=TODAY))
-        self.assertEqual(config.CONF_BACKUP.read_text(), "# my own config\n")
-        self.assertTrue(config.CONF.read_text().startswith(config.MARKER))
-
-        profiles.update(settings(late_after=0), today=TODAY)
-        self.assertEqual(config.CONF_BACKUP.read_text(), "# my own config\n")
+        with self.assertRaises(RuntimeError):
+            profiles.update(SETTINGS, force=True, today=TODAY)
+        self.assertEqual(config.CONF.read_text(), "# my own config\n")
 
     def test_unchanged_day_and_settings_is_a_no_op(self):
         profiles.update(SETTINGS, today=TODAY)

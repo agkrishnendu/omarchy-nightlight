@@ -1,5 +1,7 @@
 """Command-line interface.
 
+  nightlight-schedule enable [schedule options] [--json]   # take over hyprsunset.conf
+  nightlight-schedule disable [--json]                     # restore it, forget state
   nightlight-schedule status [--json]
   nightlight-schedule set <kelvin|off> [--until next|morning|1h|30m|HH:MM] [--json]
   nightlight-schedule resume [--json]
@@ -9,22 +11,29 @@
 
 Schedule options (remembered until changed):
   --evening-temp K  --late-temp K  --late-after MINUTES  --off-time HH:MM
+
+Until `enable`, only status and disable do anything: the plugin never touches
+hyprsunset.conf or hyprsunset without the user's consent.
 """
 
 import argparse
 import re
 
-from . import config, hyprsunset, override, profiles, status
+from . import hyprsunset, lifecycle, override, profiles, status
+
+NOT_ENABLED = "not enabled yet: run `nightlight-schedule enable` or use the bar popup"
 
 
 def sync(settings):
     """Everything the widget's poll needs; returns a problem string or None."""
+    if not lifecycle.enabled():
+        return None
     problem = None
     try:
         profiles.update(settings)
     except Exception as e:
         problem = str(e)
-    if hyprsunset.pid() is None and config.CONF.exists():
+    if hyprsunset.pid() is None:
         hyprsunset.start()
     override.enforce()
     return problem
@@ -49,11 +58,13 @@ def parser():
                                help="minutes after sunset to switch to the late temperature; 0 disables")
     schedule_opts.add_argument("--off-time", dest="off_time", type=hhmm)
 
+    sub.add_parser("enable", parents=[schedule_opts],
+                   help="back up hyprsunset.conf and manage it from now on").add_argument("--json", action="store_true")
     up = sub.add_parser("update", parents=[schedule_opts], help="regenerate today's profiles")
     up.add_argument("--force", action="store_true")
     sub.add_parser("sync", parents=[schedule_opts],
                    help="keep hyprsunset, profiles and override current").add_argument("--json", action="store_true")
-    for name in ("status", "resume", "restart"):
+    for name in ("status", "resume", "restart", "disable"):
         sub.add_parser(name).add_argument("--json", action="store_true")
     sp = sub.add_parser("set", help="override the temperature")
     sp.add_argument("value", help="kelvin, or 'off'")
@@ -66,6 +77,17 @@ def parser():
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
+
+    if args.cmd == "disable":
+        message = lifecycle.disable()
+        if args.json:
+            status.print_report(True)
+        else:
+            print(f"night light disabled: {message}")
+        return 0
+
+    if args.cmd not in ("status", "enable", "sync") and not lifecycle.enabled():
+        p.exit(1, f"nightlight-schedule: {NOT_ENABLED}\n")
 
     if args.cmd == "update":
         if profiles.update(profiles.resolve_settings(args), force=args.force):
@@ -87,6 +109,11 @@ def main(argv=None):
     elif args.cmd == "restart":
         hyprsunset.restart()
         override.enforce()
+    elif args.cmd == "enable":
+        try:
+            lifecycle.enable(profiles.resolve_settings(args))
+        except Exception as e:
+            problem = str(e)
     elif args.cmd == "sync":
         problem = sync(profiles.resolve_settings(args))
 

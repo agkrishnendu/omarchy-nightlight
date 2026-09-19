@@ -2,8 +2,9 @@
   "schemaVersion": 1,
   "id": "krisag.nightlight",
   "name": "Sunset Night Light",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "krisag",
+  "license": "MIT",
   "description": "Night light that follows your local sunset, with a bar popup to see and override it",
   "kinds": [
     "bar-widget"

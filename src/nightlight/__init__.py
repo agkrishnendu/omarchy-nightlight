@@ -17,6 +17,7 @@ Modules:
   config      paths, defaults, JSON state helpers
   sun         location lookup and sunset calculation
   hyprsunset  IPC with and process control of hyprsunset
+  lifecycle   enabling (with consent) and disabling (restoring the config)
   profiles    generating and reading hyprsunset.conf
   schedule    pure time logic over the daily profiles
   override    manual overrides and keeping them applied

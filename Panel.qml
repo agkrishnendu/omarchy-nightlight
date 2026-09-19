@@ -39,16 +39,22 @@ Panel {
   ]
 
   readonly property var override: status ? status.override : null
+  // Nothing is written until the user enables the plugin from the popup;
+  // before that the status reports enabled: false and the popup offers setup.
+  readonly property bool enabled: status ? status.enabled !== false : true
   readonly property bool healthy: status ? status.ok === true : true
+  // The disable button asks for a second click before restoring the config.
+  property bool confirmingDisable: false
   readonly property var effective: status ? status.effective : null
-  // Shown in the evening, while overridden, when broken at night, or when
-  // opened by IPC during the day.
-  readonly property bool shown: opened || (status !== null && (status.night === true || override !== null))
+  // Shown until set up, then in the evening, while overridden, or when opened
+  // by IPC during the day.
+  readonly property bool shown: opened || (status !== null && (!enabled || status.night === true || override !== null))
 
   function kelvin(k) { return k === null || k === undefined ? "Off" : k + "K" }
 
   function heroStatusText() {
     if (!status) return "Loading"
+    if (!enabled) return "Not set up"
     if (status.problem && status.profiles.length === 0) return "No schedule"
     if (!status.running) return "Not running"
     if (!healthy) return "Not responding"
@@ -59,6 +65,7 @@ Panel {
 
   function tooltip() {
     if (!status) return ""
+    if (!enabled) return "Night light: click to set up the sunset schedule"
     if (!healthy) return "Night light: hyprsunset not responding"
     var text = "Night light " + kelvin(effective)
     if (override) return text + " (override until " + override.untilLabel + ")"
@@ -95,8 +102,21 @@ Panel {
     if (override) setTemperature(override.temperature === null ? "off" : override.temperature)
   }
 
+  function enable() { run(["enable"].concat(root.scheduleArgs)) }
+
+  function disable() {
+    if (!confirmingDisable) {
+      confirmingDisable = true
+      disableConfirmTimer.restart()
+      return
+    }
+    confirmingDisable = false
+    run(["disable"])
+  }
+
   function quickToggle() {
-    if (override) resume()
+    if (!enabled) root.open()
+    else if (override) resume()
     else run(["set", "off", "--until", "next"])
   }
 
@@ -159,6 +179,7 @@ Panel {
   Timer { interval: 1000; running: true; onTriggered: root.refresh() }
   Timer { interval: 30000; running: true; repeat: true; onTriggered: root.refresh() }
   Timer { id: boundaryTimer; repeat: false; onTriggered: root.refresh() }
+  Timer { id: disableConfirmTimer; interval: 4000; onTriggered: root.confirmingDisable = false }
 
   BarIconButton {
     id: button
@@ -166,7 +187,7 @@ Panel {
     bar: root.bar
     text: !root.healthy ? root.alertIcon
       : (root.override && root.override.temperature === null ? root.sunIcon : root.moonIcon)
-    active: root.override !== null || !root.healthy
+    active: !root.enabled || root.override !== null || !root.healthy
     tooltipText: root.opened ? "" : root.tooltip()
     onPressed: function(b) {
       if (b === Qt.RightButton) root.quickToggle()
@@ -249,7 +270,7 @@ Panel {
           Text {
             id: heroValue
             textFormat: Text.PlainText
-            text: root.status ? root.kelvin(root.effective) : "—"
+            text: root.status && root.enabled ? root.kelvin(root.effective) : "—"
             color: root.bar.foreground
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.displayLarge
@@ -268,7 +289,7 @@ Panel {
 
         // ---------- hyprsunset unreachable ----------
         Row {
-          visible: root.status !== null && !root.healthy
+          visible: root.status !== null && root.enabled && !root.healthy
           width: parent.width
           spacing: Style.space(10)
 
@@ -292,141 +313,192 @@ Panel {
           }
         }
 
-        // ---------- Today's schedule ----------
-        PanelSeparator { foreground: root.bar.foreground }
-
+        // ---------- Setup: nothing is written before this ----------
         Column {
-          width: parent.width
-          spacing: Style.spacing.labelGap
-
-          PanelSectionHeader {
-            text: "SCHEDULE"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-          }
-
-          Repeater {
-            model: root.status ? root.status.profiles : []
-
-            Row {
-              required property var modelData
-              readonly property bool current: root.status.scheduled !== null && root.status.scheduled.time === modelData.time && !root.override
-
-              width: parent.width
-              spacing: Style.space(8)
-              opacity: current ? 1 : 0.6
-
-              InfoValue {
-                text: (parent.current ? "● " : "  ") + parent.modelData.time
-                font.bold: parent.current
-              }
-              Item { width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2); height: 1 }
-              InfoValue {
-                text: root.kelvin(parent.modelData.temperature)
-                font.bold: parent.current
-              }
-            }
-          }
-        }
-
-        // ---------- Override ----------
-        PanelSeparator { foreground: root.bar.foreground }
-
-        Column {
+          visible: root.status !== null && !root.enabled
           width: parent.width
           spacing: Style.space(10)
 
-          PanelSectionHeader {
-            text: "OVERRIDE"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
+          PanelSeparator { foreground: root.bar.foreground }
+
+          InfoValue {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: "Warm the screen from your local sunset, and override it from here."
           }
 
-          Row {
-            id: presetRow
+          InfoLabel {
             width: parent.width
-            spacing: Style.space(6)
-
-            readonly property var presets: ["off"].concat(root.status ? root.status.presets : [])
-            readonly property real cellWidth: (width - spacing * (presets.length - 1)) / presets.length
-
-            Repeater {
-              model: presetRow.presets
-
-              Button {
-                required property var modelData
-                width: presetRow.cellWidth
-                text: modelData === "off" ? "Off" : modelData + "K"
-                fontSize: Style.font.bodySmall
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                bordered: true
-                active: root.override !== null
-                  && (modelData === "off" ? root.override.temperature === null : root.override.temperature === modelData)
-                onClicked: root.setTemperature(modelData)
-              }
-            }
-          }
-
-          Row {
-            width: parent.width
-            spacing: Style.space(10)
-
-            PanelSlider {
-              id: slider
-              bar: root.bar
-              width: parent.width - sliderValue.width - parent.spacing
-              anchors.verticalCenter: parent.verticalCenter
-              minimum: 1900
-              maximum: 6500
-              step: 100
-              integer: true
-              value: typeof root.effective === "number" ? root.effective : 6500
-              onReleased: function(v) { root.setTemperature(Math.round(v)) }
-            }
-
-            InfoValue {
-              id: sliderValue
-              width: Style.space(52)
-              horizontalAlignment: Text.AlignRight
-              anchors.verticalCenter: parent.verticalCenter
-              text: Math.round(slider.liveValue) + "K"
-            }
-          }
-
-          Row {
-            id: holdRow
-            width: parent.width
-            spacing: Style.space(6)
-
-            readonly property real cellWidth: (width - spacing * (root.holds.length - 1)) / root.holds.length
-
-            Repeater {
-              model: root.holds
-
-              Button {
-                required property var modelData
-                width: holdRow.cellWidth
-                text: modelData.label
-                fontSize: Style.font.bodySmall
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                bordered: true
-                active: root.hold === modelData.value
-                onClicked: root.setHold(modelData.value)
-              }
-            }
+            wrapMode: Text.WordWrap
+            text: "Enabling backs up ~/.config/hypr/hyprsunset.conf to hyprsunset.conf.pre-nightlight and replaces it with a generated schedule. Disabling restores it."
           }
 
           Button {
-            visible: root.override !== null
             width: parent.width
-            text: "Resume schedule"
+            text: actionProc.running ? "Enabling…" : "Enable sunset schedule"
             fontSize: Style.font.bodySmall
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
             bordered: true
-            onClicked: root.resume()
+            onClicked: root.enable()
+          }
+        }
+
+        Column {
+          visible: root.enabled
+          width: parent.width
+          spacing: Style.space(14)
+
+          // ---------- Today's schedule ----------
+          PanelSeparator { foreground: root.bar.foreground }
+
+          Column {
+            width: parent.width
+            spacing: Style.spacing.labelGap
+
+            PanelSectionHeader {
+              text: "SCHEDULE"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+            }
+
+            Repeater {
+              model: root.status ? root.status.profiles : []
+
+              Row {
+                required property var modelData
+                readonly property bool current: root.status.scheduled !== null && root.status.scheduled.time === modelData.time && !root.override
+
+                width: parent.width
+                spacing: Style.space(8)
+                opacity: current ? 1 : 0.6
+
+                InfoValue {
+                  text: (parent.current ? "● " : "  ") + parent.modelData.time
+                  font.bold: parent.current
+                }
+                Item { width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2); height: 1 }
+                InfoValue {
+                  text: root.kelvin(parent.modelData.temperature)
+                  font.bold: parent.current
+                }
+              }
+            }
+          }
+
+          // ---------- Override ----------
+          PanelSeparator { foreground: root.bar.foreground }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(10)
+
+            PanelSectionHeader {
+              text: "OVERRIDE"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+            }
+
+            Row {
+              id: presetRow
+              width: parent.width
+              spacing: Style.space(6)
+
+              readonly property var presets: ["off"].concat(root.status ? root.status.presets : [])
+              readonly property real cellWidth: (width - spacing * (presets.length - 1)) / presets.length
+
+              Repeater {
+                model: presetRow.presets
+
+                Button {
+                  required property var modelData
+                  width: presetRow.cellWidth
+                  text: modelData === "off" ? "Off" : modelData + "K"
+                  fontSize: Style.font.bodySmall
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
+                  bordered: true
+                  active: root.override !== null
+                    && (modelData === "off" ? root.override.temperature === null : root.override.temperature === modelData)
+                  onClicked: root.setTemperature(modelData)
+                }
+              }
+            }
+
+            Row {
+              width: parent.width
+              spacing: Style.space(10)
+
+              PanelSlider {
+                id: slider
+                bar: root.bar
+                width: parent.width - sliderValue.width - parent.spacing
+                anchors.verticalCenter: parent.verticalCenter
+                minimum: 1900
+                maximum: 6500
+                step: 100
+                integer: true
+                value: typeof root.effective === "number" ? root.effective : 6500
+                onReleased: function(v) { root.setTemperature(Math.round(v)) }
+              }
+
+              InfoValue {
+                id: sliderValue
+                width: Style.space(52)
+                horizontalAlignment: Text.AlignRight
+                anchors.verticalCenter: parent.verticalCenter
+                text: Math.round(slider.liveValue) + "K"
+              }
+            }
+
+            Row {
+              id: holdRow
+              width: parent.width
+              spacing: Style.space(6)
+
+              readonly property real cellWidth: (width - spacing * (root.holds.length - 1)) / root.holds.length
+
+              Repeater {
+                model: root.holds
+
+                Button {
+                  required property var modelData
+                  width: holdRow.cellWidth
+                  text: modelData.label
+                  fontSize: Style.font.bodySmall
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
+                  bordered: true
+                  active: root.hold === modelData.value
+                  onClicked: root.setHold(modelData.value)
+                }
+              }
+            }
+
+            Button {
+              visible: root.override !== null
+              width: parent.width
+              text: "Resume schedule"
+              fontSize: Style.font.bodySmall
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              bordered: true
+              onClicked: root.resume()
+            }
+          }
+
+          // ---------- Give hyprsunset.conf back ----------
+          PanelSeparator { foreground: root.bar.foreground }
+
+          Button {
+            width: parent.width
+            text: root.confirmingDisable ? "Click again to restore your hyprsunset.conf" : "Disable and restore hyprsunset.conf"
+            fontSize: Style.font.bodySmall
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            bordered: true
+            active: root.confirmingDisable
+            onClicked: root.disable()
           }
         }
       }

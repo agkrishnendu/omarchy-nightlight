@@ -61,6 +61,7 @@ class SandboxTest(unittest.TestCase):
             "pid": lambda: self.hyprsunset_pid,
             "restart": mock.Mock(),
             "start": mock.Mock(),
+            "stop": mock.Mock(),
         }
         from nightlight import hyprsunset
         for name, fn in stubs.items():
@@ -68,6 +69,14 @@ class SandboxTest(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.restart = hyprsunset.restart
+        self.start = hyprsunset.start
+        self.stop = hyprsunset.stop
+
+        # Never look up a real location
+        from nightlight import sun
+        patcher = mock.patch.object(sun, "location", return_value=(12.983, 77.583))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def _apply(self, temp):
         self.applied.append(temp)

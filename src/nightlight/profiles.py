@@ -1,7 +1,6 @@
 """Generating hyprsunset.conf from the day's sunset, and reading it back."""
 
 import re
-import shutil
 from datetime import date, timedelta
 
 from . import config, hyprsunset, sun
@@ -25,14 +24,19 @@ def weather_mtime():
         return None
 
 
+def managed():
+    """Whether hyprsunset.conf is ours to rewrite. It only becomes ours when
+    the user enables the plugin (see lifecycle.enable)."""
+    try:
+        return config.CONF.read_text().startswith(config.MARKER)
+    except OSError:
+        return False
+
+
 def needs_update(settings, today=None):
     today = today or date.today()
     state = config.read_json(config.SCHEDULE_STATE) or {}
-    try:
-        ours = config.CONF.read_text().startswith(config.MARKER)
-    except OSError:
-        ours = False
-    return (not ours
+    return (not managed()
             or state.get("date") != today.isoformat()
             or state.get("settings") != settings
             or state.get("weather_mtime") != weather_mtime())
@@ -58,18 +62,18 @@ def render_conf(settings, lat, lon, set_at):
 def update(settings, force=False, today=None):
     """Regenerate hyprsunset.conf; restart hyprsunset if it changed.
 
-    Returns whether the file changed.
+    Refuses to replace a hyprsunset.conf the plugin doesn't manage: taking
+    it over needs the user's consent, via lifecycle.enable. Returns whether
+    the file changed.
     """
     today = today or date.today()
+    path = config.CONF
+    if path.exists() and not managed():
+        raise RuntimeError("hyprsunset.conf isn't managed by the plugin; enable it first")
     if not force and not needs_update(settings, today):
         return False
     lat, lon = sun.location()
     conf = render_conf(settings, lat, lon, sun.sunset(lat, lon, today))
-    path = config.CONF
-
-    # Keep whatever the user had before we first took over the file
-    if path.exists() and not path.read_text().startswith(config.MARKER) and not config.CONF_BACKUP.exists():
-        shutil.copy2(path, config.CONF_BACKUP)
 
     changed = not path.exists() or path.read_text() != conf
     if changed:
