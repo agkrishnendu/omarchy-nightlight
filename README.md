@@ -42,7 +42,7 @@ Then click the moon in the bar and choose **Enable sunset schedule**.
 Until you enable it, the moon stays in the bar with a setup prompt, and the
 plugin doesn't touch your files or hyprsunset.
 
-To update, run `omarchy plugin update krisag.nightlight`, then
+To update, run `omarchy plugin update io.github.agkrishnendu.nightlight`, then
 `omarchy restart shell`. Without the restart, the shell's hot reload can leave
 the old copy of the widget running alongside the new one.
 
@@ -81,7 +81,7 @@ The icon is hidden during the day once the plugin is enabled. To open the
 popup anyway, for example from a keybinding, run:
 
 ```bash
-omarchy-shell krisag.nightlight open    # also: close, toggle, refresh, resume
+omarchy-shell io.github.agkrishnendu.nightlight open    # also: close, toggle, refresh, resume
 ```
 
 ## Settings
@@ -110,7 +110,7 @@ The widget is a thin front end to the bundled `src/nightlight-schedule.py`,
 which you can also run yourself:
 
 ```bash
-S=~/.config/omarchy/plugins/krisag.nightlight/src/nightlight-schedule.py
+S=~/.config/omarchy/plugins/io.github.agkrishnendu.nightlight/src/nightlight-schedule.py
 $S enable                         # back up hyprsunset.conf and start the schedule
 $S status                         # now 3400K, 2700K at 21:18
 $S set 2700 --until morning       # --until next | morning | 1h | 30m | HH:MM
@@ -124,7 +124,7 @@ $S status --json                  # what the widget reads
 To make it a command, symlink it onto your `PATH`:
 
 ```bash
-ln -s ~/.config/omarchy/plugins/krisag.nightlight/src/nightlight-schedule.py ~/.local/bin/nightlight-schedule
+ln -s ~/.config/omarchy/plugins/io.github.agkrishnendu.nightlight/src/nightlight-schedule.py ~/.local/bin/nightlight-schedule
 ```
 
 ## How it works
@@ -151,7 +151,7 @@ First give your `hyprsunset.conf` back. Either open the popup and click
 **Disable and restore hyprsunset.conf** (it asks you to click twice), or run:
 
 ```bash
-~/.config/omarchy/plugins/krisag.nightlight/src/nightlight-schedule.py disable
+~/.config/omarchy/plugins/io.github.agkrishnendu.nightlight/src/nightlight-schedule.py disable
 ```
 
 This moves `hyprsunset.conf.pre-nightlight` back into place, restarts
@@ -160,7 +160,7 @@ hyprsunset with it, and deletes the plugin's state. If you had no
 instead. Then remove the plugin:
 
 ```bash
-omarchy plugin remove krisag.nightlight
+omarchy plugin remove io.github.agkrishnendu.nightlight
 rm -rf ~/.local/state/nightlight-schedule   # optional: the cached location
 ```
 

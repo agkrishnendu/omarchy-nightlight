@@ -1,7 +1,8 @@
 """f.lux-style night light schedule for hyprsunset.
 
-Part of the krisag.nightlight Omarchy shell plugin. Computes today's sunset
-for your location and rewrites ~/.config/hypr/hyprsunset.conf with:
+Part of the io.github.agkrishnendu.nightlight Omarchy shell plugin. Computes
+today's sunset for your location and rewrites ~/.config/hypr/hyprsunset.conf
+with:
 
   sunset              -> evening temperature
   sunset + late-after -> late temperature (skipped when late-after is 0)

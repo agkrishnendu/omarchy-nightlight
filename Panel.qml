@@ -10,8 +10,8 @@ import qs.Ui
 // commands.
 Panel {
   id: root
-  moduleName: "krisag.nightlight"
-  ipcTarget: "krisag.nightlight"
+  moduleName: "io.github.agkrishnendu.nightlight"
+  ipcTarget: "io.github.agkrishnendu.nightlight"
   manageIpc: false
 
   // Run through python3 so the plugin works even if git drops the exec bit.
@@ -145,7 +145,7 @@ Panel {
   }
 
   IpcHandler {
-    target: "krisag.nightlight"
+    target: "io.github.agkrishnendu.nightlight"
 
     function open(): void { root.open() }
     function close(): void { root.close() }
