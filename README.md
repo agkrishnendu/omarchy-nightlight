@@ -25,7 +25,7 @@ the night light is doing and lets you override it.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/<you>/omarchy-nightlight.git --enable
+omarchy plugin add https://github.com/agkrishnendu/omarchy-nightlight.git --enable
 ```
 
 It needs `hyprsunset` and `python3`, which Omarchy already ships. You don't
