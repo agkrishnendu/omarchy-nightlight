@@ -25,6 +25,11 @@ class ParseProfiles(unittest.TestCase):
         text = "# profile { time = 01:00 }\nprofile {\n temperature = 4000\n}\n"
         self.assertEqual(profiles.parse_profiles(text), [(60, None)])
 
+    def test_profiles_sharing_a_minute_collapse_to_the_last(self):
+        text = ("profile {\n time = 18:18\n identity = true\n}\n"
+                "profile {\n time = 18:18\n temperature = 3400\n}\n")
+        self.assertEqual(profiles.parse_profiles(text), [(1098, 3400)])
+
 
 class RenderConf(unittest.TestCase):
     set_at = datetime(2026, 9, 19, 18, 18)
@@ -45,6 +50,19 @@ class RenderConf(unittest.TestCase):
 
     def test_late_skipped_when_it_would_pass_off_time(self):
         self.assertEqual(self.times(settings(late_after=900)), [(420, None), (1098, 3400)])
+
+    def test_off_time_on_sunset_leaves_the_day_off(self):
+        # No night window, and no two profiles on one minute to order
+        self.assertEqual(self.times(settings(off_time="18:18")), [(1098, None)])
+
+    def test_off_time_a_minute_after_sunset_keeps_a_one_minute_night(self):
+        self.assertEqual(self.times(settings(off_time="18:19")), [(1098, 3400), (1099, None)])
+
+    def test_rejects_settings_it_could_not_render(self):
+        for bad in (settings(off_time="24:00"), settings(evening_temp=12),
+                    settings(late_after=-5), settings(late_temp=None)):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                profiles.render_conf(bad, 12.983, 77.583, self.set_at)
 
 
 class Update(helpers.SandboxTest):

@@ -8,6 +8,16 @@ from datetime import datetime, timedelta, timezone
 from . import config
 
 
+def coords_schema(cached):
+    """Validate cached coordinates: a bad cache would produce a bad schedule."""
+    config.check(isinstance(cached, list) and len(cached) == 2,
+                 f"expected [lat, lon], got {cached!r}")
+    lat, lon = cached
+    config.check(config.is_number(lat, -90, 90), f"bad latitude {lat!r}")
+    config.check(config.is_number(lon, -180, 180), f"bad longitude {lon!r}")
+    return [float(lat), float(lon)]
+
+
 def location():
     """(lat, lon) from the Omarchy weather widget's setting, else IP
     detection via wttr.in, else the last cached coordinates."""
@@ -24,7 +34,7 @@ def location():
         return coords
     except Exception:
         pass
-    cached = config.read_json(config.CACHE)
+    cached = config.read_json(config.CACHE, coords_schema)
     if cached is None:
         raise RuntimeError("no location: set one in the weather widget, or connect to the internet")
     return tuple(cached)

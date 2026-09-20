@@ -2,10 +2,21 @@
 
 Other modules read these as `config.NAME` at call time (never
 `from .config import NAME`) so tests can point them at a temporary directory.
+
+State files are written atomically and read through a schema, because two
+processes can touch them at once (the widget's poll and a user action) and a
+half-written or hand-edited file must never crash a caller.
 """
 
 import json
+import os
+import sys
+import tempfile
 from pathlib import Path
+
+# Bumped when a state file's shape changes; a file from a newer version is
+# ignored rather than misread.
+SCHEMA_VERSION = 1
 
 DEFAULTS = {
     "evening_temp": 3400,
@@ -13,6 +24,9 @@ DEFAULTS = {
     "late_after": 180,
     "off_time": "07:00",
 }
+
+# What hyprsunset accepts, and so the range every entry point validates against
+KELVIN_RANGE = (1000, 20000)
 
 HOME = Path.home()
 CONF = HOME / ".config/hypr/hyprsunset.conf"
@@ -23,15 +37,93 @@ STATE = HOME / ".local/state/nightlight-schedule"
 CACHE = STATE / "coords.json"
 OVERRIDE = STATE / "override.json"
 SCHEDULE_STATE = STATE / "schedule.json"
+# The scheduled temperature we still owe the screen after dropping an override
+PENDING_RESTORE = STATE / "restore-pending.json"
 
 
-def read_json(path):
+def check(ok, message):
+    """Raise ValueError unless `ok`. The state schemas are written with this."""
+    if not ok:
+        raise ValueError(message)
+
+
+def is_int(value, low=None, high=None):
+    return (isinstance(value, int) and not isinstance(value, bool)
+            and (low is None or value >= low) and (high is None or value <= high))
+
+
+def is_number(value, low=None, high=None):
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and (low is None or value >= low) and (high is None or value <= high))
+
+
+def is_hhmm(value):
+    if not isinstance(value, str):
+        return False
+    parts = value.split(":")
+    return (len(parts) == 2 and all(p.isdigit() for p in parts)
+            and len(parts[1]) == 2 and 0 <= int(parts[0]) <= 23 and 0 <= int(parts[1]) <= 59)
+
+
+def versioned(data):
+    """`data` plus the schema version, ready for write_json."""
+    return {"version": SCHEMA_VERSION, **data}
+
+
+def check_version(data):
+    """Accept our own version, and a legacy file that predates the field."""
+    version = data.get("version", SCHEMA_VERSION)
+    check(version == SCHEMA_VERSION, f"unsupported schema version {version!r}")
+
+
+def read_json(path, schema=None):
+    """Parsed `path`, or None when it is missing or unusable.
+
+    `schema` validates the shape and returns the data (see `check`). A file
+    that isn't valid JSON, or that the schema rejects, is moved aside as
+    `<name>.bad`: treating it as absent lets the caller rebuild the state, and
+    keeping a copy leaves something to diagnose.
+    """
     try:
-        return json.loads(path.read_text())
-    except (OSError, ValueError):
+        text = path.read_text()
+    except OSError:
         return None
+    try:
+        data = json.loads(text)
+    except ValueError as e:
+        return _discard(path, f"invalid JSON: {e}")
+    if schema is None:
+        return data
+    try:
+        return schema(data)
+    except (ValueError, TypeError, KeyError, IndexError) as e:
+        return _discard(path, e)
+
+
+def _discard(path, reason):
+    print(f"nightlight: ignoring {path} ({reason})", file=sys.stderr)
+    try:
+        path.replace(path.with_name(path.name + ".bad"))
+    except OSError:
+        pass
+    return None
 
 
 def write_json(path, data):
+    """Write `data` to `path` atomically, so no reader sees it half-written."""
+    write_text(path, json.dumps(data))
+
+
+def write_text(path, text):
+    """Replace `path` with `text` atomically."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise

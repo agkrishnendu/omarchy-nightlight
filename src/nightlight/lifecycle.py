@@ -47,6 +47,7 @@ def disable():
     """
     config.OVERRIDE.unlink(missing_ok=True)
     config.SCHEDULE_STATE.unlink(missing_ok=True)
+    config.PENDING_RESTORE.unlink(missing_ok=True)
     if not profiles.managed():
         return "nothing to restore: hyprsunset.conf isn't managed by the plugin"
     if config.CONF_BACKUP.exists():

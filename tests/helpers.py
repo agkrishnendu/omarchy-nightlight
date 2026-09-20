@@ -1,5 +1,7 @@
 """Shared test setup: import from src/ and sandbox every state path."""
 
+import contextlib
+import io
 import sys
 import tempfile
 import unittest
@@ -29,6 +31,11 @@ profile {
 """
 
 
+def quiet():
+    """Swallow the warning config.read_json prints when it discards a file."""
+    return contextlib.redirect_stderr(io.StringIO())
+
+
 class SandboxTest(unittest.TestCase):
     """Points every config path at a temp dir and stubs out hyprsunset, so
     tests never touch the real screen or ~/.config."""
@@ -45,14 +52,17 @@ class SandboxTest(unittest.TestCase):
             "CACHE": root / "state/coords.json",
             "OVERRIDE": root / "state/override.json",
             "SCHEDULE_STATE": root / "state/schedule.json",
+            "PENDING_RESTORE": root / "state/restore-pending.json",
         }
         for name, path in paths.items():
             patcher = mock.patch.object(config, name, path)
             patcher.start()
             self.addCleanup(patcher.stop)
 
-        # A fake hyprsunset: remembers the last applied value, never restarts
+        # A fake hyprsunset: remembers the last applied value, never restarts.
+        # Set apply_fails to make its IPC reject every temperature.
         self.applied = []
+        self.apply_fails = False
         self.hyprsunset_temp = 3400
         self.hyprsunset_pid = 1234
         stubs = {
@@ -80,6 +90,8 @@ class SandboxTest(unittest.TestCase):
 
     def _apply(self, temp):
         self.applied.append(temp)
+        if self.apply_fails:
+            return False
         if temp is not None:
             self.hyprsunset_temp = temp
         return True

@@ -141,9 +141,18 @@ ln -s ~/.config/omarchy/plugins/io.github.agkrishnendu.nightlight/src/nightlight
   after each scheduled change. When enabled, `sync` does three things:
   1. starts hyprsunset if it isn't running
   2. refreshes the profiles when needed
-  3. re-applies an active override
+  3. re-applies an active override, or retries a restore that didn't land
 - Its state is kept in `~/.local/state/nightlight-schedule/`: the override,
-  the last settings used, and the cached coordinates.
+  the last settings used, and the cached coordinates. State files are replaced
+  atomically and checked when read; one that doesn't hold what the plugin
+  writes is moved aside as `<name>.bad` and rebuilt.
+- Ending an override (by `resume` or by expiry) owes the screen its scheduled
+  temperature. If hyprsunset doesn't take it, the debt is kept and the next
+  `sync` tries again, rather than leaving the override on screen until the next
+  scheduled change.
+- Your morning off time bounds the night: an evening or late profile that would
+  land on or after it is dropped. If sunset itself falls on your off time, that
+  day has no night window.
 
 ## Uninstall
 
@@ -190,6 +199,9 @@ Run the tests and check the plugin before you push:
 python3 -B -m unittest discover -s tests
 omarchy plugin validate .
 ```
+
+`.github/workflows/ci.yml` runs the tests on pushes and pull requests
+(`omarchy plugin validate` needs Omarchy, so it stays a local check).
 
 The tests point every path at a temporary directory and replace hyprsunset
 with a stub, so they never touch your screen or config.
