@@ -66,6 +66,20 @@ class ReadJson(helpers.SandboxTest):
         # The KeyError from the review: an override without `until`
         self.assertIsNone(self.read('{"temperature": 2700}'))
 
+    def test_missing_temperature_is_not_null(self):
+        # status indexes ov["temperature"]; only an explicit null means "off"
+        self.assertIsNone(self.read(json.dumps(
+            {"hold": "1h", "until": 1.0, "applied_at": 0, "pid": 1})))
+
+    def test_timestamps_must_be_finite_and_representable(self):
+        for bad in ("1e20", "-1e20", "NaN", "Infinity", "-Infinity"):
+            for key in ("until", "applied_at"):
+                fields = {"until": "1.0", "applied_at": "0", key: bad}
+                text = ('{"temperature": 2700, "hold": "1h", "pid": 1, '
+                        + ", ".join(f'"{k}": {v}' for k, v in fields.items()) + "}")
+                with self.subTest(key=key, value=bad):
+                    self.assertIsNone(self.read(text))
+
     def test_field_of_the_wrong_type(self):
         self.assertIsNone(self.read(json.dumps(
             {"temperature": 2700, "hold": "1h", "until": "soon", "applied_at": 0, "pid": 1})))

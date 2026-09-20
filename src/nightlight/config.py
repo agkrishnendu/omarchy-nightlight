@@ -9,9 +9,11 @@ half-written or hand-edited file must never crash a caller.
 """
 
 import json
+import math
 import os
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 # Bumped when a state file's shape changes; a file from a newer version is
@@ -53,8 +55,22 @@ def is_int(value, low=None, high=None):
 
 
 def is_number(value, low=None, high=None):
+    """A finite int or float (NaN and infinity are valid JSON to Python, but
+    never a value we wrote)."""
     return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value)
             and (low is None or value >= low) and (high is None or value <= high))
+
+
+def is_timestamp(value):
+    """A number `datetime` can turn back into a local time."""
+    if not is_number(value):
+        return False
+    try:
+        datetime.fromtimestamp(value)
+    except (OverflowError, OSError, ValueError):
+        return False
+    return True
 
 
 def is_hhmm(value):

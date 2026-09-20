@@ -19,12 +19,14 @@ def override_schema(ov):
     """Validate an override file: anything we couldn't have written is junk."""
     config.check(isinstance(ov, dict), "expected an object")
     config.check_version(ov)
-    temp = ov.get("temperature")
+    # null means "off", but callers index ov["temperature"], so it must be present
+    config.check("temperature" in ov, "missing temperature")
+    temp = ov["temperature"]
     config.check(temp is None or config.is_int(temp, *config.KELVIN_RANGE),
                  f"bad temperature {temp!r}")
     config.check(isinstance(ov.get("hold"), str), f"bad hold {ov.get('hold')!r}")
     for key in ("until", "applied_at"):
-        config.check(config.is_number(ov.get(key)), f"bad {key} {ov.get(key)!r}")
+        config.check(config.is_timestamp(ov.get(key)), f"bad {key} {ov.get(key)!r}")
     pid = ov.get("pid")
     config.check(pid is None or config.is_int(pid, 1), f"bad pid {pid!r}")
     return ov
