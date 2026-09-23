@@ -12,8 +12,9 @@ def occurrences(profiles, now):
     """(start datetime, kelvin) for every profile from yesterday through the
     day after tomorrow, sorted."""
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    return sorted((midnight + timedelta(days=d, minutes=m), k)
-                  for d in (-1, 0, 1, 2) for m, k in profiles)
+    return sorted(((midnight + timedelta(days=d, minutes=m), k)
+                   for d in (-1, 0, 1, 2) for m, k in profiles),
+                  key=lambda o: o[0])
 
 
 def active_and_next(occ, now):

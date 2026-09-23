@@ -17,9 +17,8 @@ hyprsunset.conf or hyprsunset without the user's consent.
 """
 
 import argparse
-import re
 
-from . import hyprsunset, lifecycle, override, profiles, status
+from . import config, hyprsunset, lifecycle, override, profiles, status
 
 NOT_ENABLED = "not enabled yet: run `nightlight-schedule enable` or use the bar popup"
 
@@ -40,10 +39,10 @@ def sync(settings):
 
 
 def hhmm(value):
-    if not re.fullmatch(r"([01]?\d|2[0-3]):[0-5]\d", value):
+    if not config.is_hhmm(value):
         raise argparse.ArgumentTypeError("expected HH:MM")
     h, m = value.split(":")
-    return f"{int(h):02d}:{m}"
+    return f"{int(h):02d}:{int(m):02d}"
 
 
 def parser():
@@ -90,7 +89,11 @@ def main(argv=None):
         p.exit(1, f"nightlight-schedule: {NOT_ENABLED}\n")
 
     if args.cmd == "update":
-        if profiles.update(profiles.resolve_settings(args), force=args.force):
+        try:
+            changed = profiles.update(profiles.resolve_settings(args), force=args.force)
+        except (RuntimeError, ValueError) as e:
+            p.exit(1, f"nightlight-schedule: {e}\n")
+        if changed:
             print("profiles updated")
             override.enforce()
         status.print_report(False)

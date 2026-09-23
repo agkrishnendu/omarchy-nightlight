@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Omarchy ships 3.13; the older version keeps the stdlib-only promise honest
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Unit tests
+        run: python3 -B -m unittest discover -s tests -v
+      - name: CLI smoke test
+        # A plugin-free HOME: status must work and touch nothing
+        run: |
+          export HOME="$(mktemp -d)"
+          python3 -B src/nightlight-schedule.py status --json
+          test -z "$(ls -A "$HOME")"
+      - name: No bytecode left in the plugin folder
+        # The Omarchy shell hot-reloads the plugin on any file change there
+        run: |
+          found="$(find . -name __pycache__ -not -path './.git/*')"
+          if [ -n "$found" ]; then echo "left behind: $found"; exit 1; fi
