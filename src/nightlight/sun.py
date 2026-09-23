@@ -7,6 +7,10 @@ from datetime import datetime, timedelta, timezone
 
 from . import config
 
+# wttr.in's j1 payload is a few KB; a compromised or malfunctioning endpoint
+# could otherwise stream an unbounded body into json.load every sync.
+WTTR_MAX_BYTES = 1 << 20  # 1 MiB
+
 
 def coords_schema(cached):
     """Validate cached coordinates: a bad cache would produce a bad schedule."""
@@ -28,7 +32,10 @@ def location():
         pass
     try:
         with urllib.request.urlopen("https://wttr.in/?format=j1", timeout=10) as r:
-            area = json.load(r)["nearest_area"][0]
+            body = r.read(WTTR_MAX_BYTES + 1)
+            if len(body) > WTTR_MAX_BYTES:
+                raise ValueError(f"wttr.in response exceeded {WTTR_MAX_BYTES} bytes")
+            area = json.loads(body)["nearest_area"][0]
         coords = float(area["latitude"]), float(area["longitude"])
         config.write_json(config.CACHE, coords)
         return coords
