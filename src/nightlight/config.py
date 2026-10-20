@@ -41,6 +41,9 @@ OVERRIDE = STATE / "override.json"
 SCHEDULE_STATE = STATE / "schedule.json"
 # The scheduled temperature we still owe the screen after dropping an override
 PENDING_RESTORE = STATE / "restore-pending.json"
+# Serializes runs (see cli.exclusive). Runtime dir, so `status` in a fresh
+# HOME still touches nothing there.
+LOCK = Path(os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()) / f"nightlight-schedule-{os.getuid()}.lock"
 
 
 def check(ok, message):

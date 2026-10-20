@@ -1,4 +1,5 @@
 import contextlib
+import fcntl
 import io
 import json
 import unittest
@@ -113,6 +114,30 @@ class Disable(helpers.SandboxTest):
         self.stop.assert_not_called()
         self.restart.assert_not_called()
 
+
+
+class RunLock(helpers.SandboxTest):
+    """Each monitor's bar runs its own widget, so syncs must not overlap."""
+
+    def lock_is_free(self):
+        with open(config.LOCK, "a") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return False
+            fcntl.flock(f, fcntl.LOCK_UN)
+            return True
+
+    def test_mutating_commands_hold_the_lock(self):
+        seen = []
+        with mock.patch.object(cli, "sync", side_effect=lambda s: seen.append(self.lock_is_free())):
+            run_cli("sync", "--json")
+        self.assertEqual(seen, [False])
+        self.assertTrue(self.lock_is_free())
+
+    def test_status_never_takes_the_lock(self):
+        run_cli("status", "--json")
+        self.assertFalse(config.LOCK.exists())
 
 if __name__ == "__main__":
     unittest.main()

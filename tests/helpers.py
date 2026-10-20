@@ -53,6 +53,7 @@ class SandboxTest(unittest.TestCase):
             "OVERRIDE": root / "state/override.json",
             "SCHEDULE_STATE": root / "state/schedule.json",
             "PENDING_RESTORE": root / "state/restore-pending.json",
+            "LOCK": root / "run/nightlight-schedule.lock",
         }
         for name, path in paths.items():
             patcher = mock.patch.object(config, name, path)

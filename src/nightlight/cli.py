@@ -17,6 +17,8 @@ hyprsunset.conf or hyprsunset without the user's consent.
 """
 
 import argparse
+import contextlib
+import fcntl
 
 from . import config, hyprsunset, lifecycle, override, profiles, status
 
@@ -36,6 +38,19 @@ def sync(settings):
         hyprsunset.start()
     override.enforce()
     return problem
+
+
+@contextlib.contextmanager
+def exclusive():
+    """Hold the run lock. Every bar shows its own copy of the widget (one per
+    monitor), each polling `sync` on its own timer. Two runs that (re)start
+    hyprsunset together start two of them: the second fails with "A CTM
+    manager is already running" and exits, and the survivor stops answering
+    IPC, so the popup reports hyprsunset as not responding."""
+    config.LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with open(config.LOCK, "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
 
 
 def hhmm(value):
@@ -76,7 +91,14 @@ def parser():
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
+    if args.cmd == "status":
+        # Read-only: never waits behind a sync, never creates the lock file
+        return run(p, args)
+    with exclusive():
+        return run(p, args)
 
+
+def run(p, args):
     if args.cmd == "disable":
         message = lifecycle.disable()
         if args.json:
