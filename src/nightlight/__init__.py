@@ -6,6 +6,7 @@ with:
 
   sunset              -> evening temperature
   sunset + late-after -> late temperature (skipped when late-after is 0)
+  extra steps         -> their temperatures, at fixed clock times
   off-time            -> off (identity)
 
 The bar widget runs `sync` every 30 seconds, which keeps hyprsunset running,

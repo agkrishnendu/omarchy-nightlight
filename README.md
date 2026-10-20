@@ -95,6 +95,19 @@ Edit these in the Omarchy settings panel, or on the plugin's entry in
 | `lateTemperature` | `2700` | Kelvin applied later in the evening |
 | `lateAfterMinutes` | `180` | Minutes after sunset to switch to the late temperature; `0` disables it |
 | `offTime` | `"07:00"` | When the filter turns off in the morning |
+| `extraSteps` | `""` | Extra steps at fixed clock times, as `HH:MM=K` separated by commas |
+
+`extraSteps` adds steps the sunset can't express, such as a very warm screen
+at bedtime and a gentler one before you get up:
+
+```json
+{ "id": "io.github.agkrishnendu.nightlight", "extraSteps": "00:00=1600, 05:00=2700" }
+```
+
+A step applies only on nights it falls between sunset and `offTime`, so a
+summer sunset after it doesn't tint the evening early. The late temperature is
+skipped on nights it would land on or after an extra step, so it never undoes
+one.
 
 Changes apply at the widget's next check, within 30 seconds.
 

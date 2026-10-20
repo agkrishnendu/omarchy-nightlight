@@ -22,7 +22,8 @@
       "eveningTemperature": 3400,
       "lateTemperature": 2700,
       "lateAfterMinutes": 180,
-      "offTime": "07:00"
+      "offTime": "07:00",
+      "extraSteps": ""
     },
     "schema": [
       {
@@ -60,6 +61,13 @@
         "type": "string",
         "label": "Off in the morning at (HH:MM)",
         "defaultValue": "07:00"
+      },
+      {
+        "key": "extraSteps",
+        "type": "string",
+        "label": "Extra steps (HH:MM=K, ...)",
+        "description": "Fixed clock times during the night, e.g. 00:00=1600, 05:00=2700. A step only applies on nights it falls between sunset and the off time.",
+        "defaultValue": ""
       }
     ]
   }

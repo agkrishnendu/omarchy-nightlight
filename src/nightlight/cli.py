@@ -11,6 +11,7 @@
 
 Schedule options (remembered until changed):
   --evening-temp K  --late-temp K  --late-after MINUTES  --off-time HH:MM
+  --extra-steps "HH:MM=K,..."   ("" for none)
 
 Until `enable`, only status and disable do anything: the plugin never touches
 hyprsunset.conf or hyprsunset without the user's consent.
@@ -45,6 +46,13 @@ def hhmm(value):
     return f"{int(h):02d}:{int(m):02d}"
 
 
+def steps(value):
+    try:
+        return profiles.format_steps(profiles.parse_steps(value))
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e))
+
+
 def parser():
     p = argparse.ArgumentParser(prog="nightlight-schedule",
                                 description="hyprsunset sunset schedule and overrides")
@@ -56,6 +64,8 @@ def parser():
     schedule_opts.add_argument("--late-after", dest="late_after", type=int,
                                help="minutes after sunset to switch to the late temperature; 0 disables")
     schedule_opts.add_argument("--off-time", dest="off_time", type=hhmm)
+    schedule_opts.add_argument("--extra-steps", dest="extra_steps", type=steps,
+                               help="fixed-time night steps, e.g. 00:00=1600,05:00=2700")
 
     sub.add_parser("enable", parents=[schedule_opts],
                    help="back up hyprsunset.conf and manage it from now on").add_argument("--json", action="store_true")

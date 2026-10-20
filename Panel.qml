@@ -20,7 +20,9 @@ Panel {
     "--evening-temp", String(setting("eveningTemperature", 3400)),
     "--late-temp", String(setting("lateTemperature", 2700)),
     "--late-after", String(setting("lateAfterMinutes", 180)),
-    "--off-time", /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(setting("offTime", ""))) ? String(setting("offTime", "")) : "07:00"
+    "--off-time", /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(setting("offTime", ""))) ? String(setting("offTime", "")) : "07:00",
+    // Malformed steps are dropped here rather than failing every sync
+    "--extra-steps", /^\s*(([01]?\d|2[0-3]):[0-5]\d\s*=\s*\d{4,5}\s*(,\s*|$))*$/.test(String(setting("extraSteps", ""))) ? String(setting("extraSteps", "")) : ""
   ]
   readonly property string moonIcon: String.fromCodePoint(0xF0594)
   readonly property string sunIcon: String.fromCodePoint(0xF0599)

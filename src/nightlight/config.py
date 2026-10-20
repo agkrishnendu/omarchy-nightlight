@@ -25,6 +25,8 @@ DEFAULTS = {
     "late_temp": 2700,
     "late_after": 180,
     "off_time": "07:00",
+    # Fixed-clock steps during the night, "HH:MM=K,HH:MM=K"; empty for none
+    "extra_steps": "",
 }
 
 # What hyprsunset accepts, and so the range every entry point validates against

@@ -31,6 +31,22 @@ class ParseProfiles(unittest.TestCase):
         self.assertEqual(profiles.parse_profiles(text), [(1098, 3400)])
 
 
+class ParseSteps(unittest.TestCase):
+    def test_parses_sorts_and_formats(self):
+        steps = profiles.parse_steps(" 5:00 = 2700 , 00:00=1600, ")
+        self.assertEqual(steps, [(0, 1600), (300, 2700)])
+        self.assertEqual(profiles.format_steps(steps), "00:00=1600,05:00=2700")
+
+    def test_empty_is_no_steps(self):
+        self.assertEqual(profiles.parse_steps(""), [])
+
+    def test_rejects_malformed_steps(self):
+        for bad in ("00:00", "24:00=1600", "00:00=warm", "00:00=500", "00:00=1600;05:00=2700",
+                    "01:00=1600,1:00=2000"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                profiles.parse_steps(bad)
+
+
 class RenderConf(unittest.TestCase):
     set_at = datetime(2026, 9, 19, 18, 18)
 
@@ -58,9 +74,32 @@ class RenderConf(unittest.TestCase):
     def test_off_time_a_minute_after_sunset_keeps_a_one_minute_night(self):
         self.assertEqual(self.times(settings(off_time="18:19")), [(1098, 3400), (1099, None)])
 
+    def test_extra_steps_join_the_night_in_order(self):
+        self.assertEqual(self.times(settings(extra_steps="00:00=1600,05:00=2700")),
+                         [(0, 1600), (300, 2700), (420, None), (1098, 3400), (1278, 2700)])
+
+    def test_extra_steps_outside_the_night_are_skipped(self):
+        # 12:00 is daytime; 18:18 is sunset itself, which the evening owns
+        self.assertEqual(self.times(settings(extra_steps="12:00=1600,18:18=2000,07:00=2500")),
+                         [(420, None), (1098, 3400), (1278, 2700)])
+
+    def test_late_step_never_undoes_an_extra_step(self):
+        # Late would land at 00:18, after the midnight step
+        self.assertEqual(self.times(settings(late_after=360, extra_steps="00:00=1600")),
+                         [(0, 1600), (420, None), (1098, 3400)])
+        # Same minute: the extra step wins
+        self.assertEqual(self.times(settings(extra_steps="21:18=2000")),
+                         [(420, None), (1098, 3400), (1278, 2000)])
+
+    def test_state_from_before_extra_steps_is_still_valid(self):
+        legacy = {k: v for k, v in SETTINGS.items() if k != "extra_steps"}
+        profiles.check_settings(legacy)
+        self.assertEqual(self.times(legacy), [(420, None), (1098, 3400), (1278, 2700)])
+
     def test_rejects_settings_it_could_not_render(self):
         for bad in (settings(off_time="24:00"), settings(evening_temp=12),
-                    settings(late_after=-5), settings(late_temp=None)):
+                    settings(late_after=-5), settings(late_temp=None),
+                    settings(extra_steps="00:00=1600,00:00=2000"), settings(extra_steps=7)):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 profiles.render_conf(bad, 12.983, 77.583, self.set_at)
 

@@ -21,6 +21,7 @@ SETTINGS = {
     "lateTemperature": "late_temp",
     "lateAfterMinutes": "late_after",
     "offTime": "off_time",
+    "extraSteps": "extra_steps",
 }
 
 

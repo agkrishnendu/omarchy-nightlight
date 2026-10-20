@@ -30,6 +30,30 @@ def check_settings(settings):
                  f"bad late_after {settings.get('late_after')!r}")
     config.check(config.is_hhmm(settings.get("off_time")),
                  f"bad off_time {settings.get('off_time')!r}")
+    # Missing in state written before extra steps existed: that file is still
+    # a valid "no extra steps" schedule, not one to throw away
+    parse_steps(settings.get("extra_steps", ""))
+
+
+def parse_steps(text):
+    """[(minutes since midnight, kelvin)] from "HH:MM=K, HH:MM=K", sorted.
+    Raises ValueError on anything else, including two steps on one minute."""
+    config.check(isinstance(text, str), f"bad extra_steps {text!r}")
+    low, high = config.KELVIN_RANGE
+    steps = {}
+    for item in filter(None, (part.strip() for part in text.split(","))):
+        at, _, kelvin = (s.strip() for s in item.partition("="))
+        config.check(config.is_hhmm(at) and kelvin.isdigit() and low <= int(kelvin) <= high,
+                     f"bad extra step {item!r}: expected HH:MM=kelvin")
+        h, m = map(int, at.split(":"))
+        config.check(h * 60 + m not in steps, f"two extra steps at {at}")
+        steps[h * 60 + m] = int(kelvin)
+    return sorted(steps.items())
+
+
+def format_steps(steps):
+    """The canonical text for parse_steps output, so equal schedules compare equal."""
+    return ",".join(f"{m // 60:02d}:{m % 60:02d}={k}" for m, k in steps)
 
 
 def read_state():
@@ -81,12 +105,22 @@ def render_conf(settings, lat, lon, set_at):
     # owns: hyprsunset would pick between them arbitrarily, and the schedule
     # could not be put in order. When sunset itself falls on the off time there
     # is no night window at all, and the day is simply left off.
+    #
+    # Extra steps are fixed clock times, so they only apply on nights they fall
+    # inside (strictly after sunset), and the sunset-relative late step never
+    # undoes one: it is dropped when it would land on or after an extra step.
     blocks = [(settings["off_time"], "identity = true")]
     if until_off > 0:
-        blocks.append((f"{set_at:%H:%M}", f"temperature = {settings['evening_temp']}"))
-        if 0 < settings["late_after"] < until_off:
-            late_at = set_at + timedelta(minutes=settings["late_after"])
-            blocks.append((f"{late_at:%H:%M}", f"temperature = {settings['late_temp']}"))
+        sunset_at = set_at.hour * 60 + set_at.minute
+        night = [(0, settings["evening_temp"])]
+        extra = [((m - sunset_at) % 1440, k)
+                 for m, k in parse_steps(settings.get("extra_steps", ""))]
+        extra = [(after, k) for after, k in extra if 0 < after < until_off]
+        late = settings["late_after"]
+        if 0 < late < until_off and all(late < after for after, _ in extra):
+            night.append((late, settings["late_temp"]))
+        for after, kelvin in sorted(night + extra):
+            blocks.append((f"{set_at + timedelta(minutes=after):%H:%M}", f"temperature = {kelvin}"))
     profiles = "".join(f"\nprofile {{\n    time = {t}\n    {body}\n}}\n" for t, body in blocks)
     return (f"{config.MARKER} — edits will be overwritten.\n"
             f"# Location {lat:.3f},{lon:.3f}; sunset today {set_at:%H:%M}\n"
